@@ -315,7 +315,9 @@ public sealed class BotIdler : IDisposable {
 		try {
 			Store.Save(new PersistedState { Quarantined = Quarantined, Observations = Observations, Ledger = new Dictionary<uint, AccrualEntry>(Ledger) });
 		} catch (Exception e) {
-			Log.Warn($"state persist failed: {e.Message}");
+			// Full exception, not just Message: on a trimmed host the ONLY diagnostic for a
+			// missing-member failure is the stack naming the member (live smoke lesson).
+			Log.Warn($"state persist failed: {e}");
 		}
 	}
 }

@@ -7,9 +7,10 @@ using System.Linq;
 using System.Reflection;
 using System.Text.Json;
 using System.Threading.Tasks;
+using System.Globalization;
+using System.Text;
 using AdvancedIdle.Core;
 using ArchiSteamFarm.Core;
-using ArchiSteamFarm.Helpers.Json;
 using ArchiSteamFarm.Plugins.Interfaces;
 using ArchiSteamFarm.Steam;
 using JetBrains.Annotations;
@@ -184,10 +185,13 @@ internal sealed class SystemClock : IIdleClock {
 
 /// <summary>
 ///     Atomic JSON persistence beside the bot's own database file. Rare writes; a corrupt/missing
-///     file degrades to fresh state with a warning, never a crash. Serialization goes through
-///     ASF's JsonUtilities (its own options/resolver), NOT raw JsonSerializer - the trimmed
-///     win-x64 host threw MissingMethodException on the default reflection path (live smoke
-///     2026-07-09), while ASF's surface is what SerializableFile itself runs on such hosts.
+///     file degrades to fresh state with a warning, never a crash. The payload is 100% numeric,
+///     so it is HAND-WRITTEN (StringBuilder out, JsonDocument in) with zero serializer
+///     reflection: on the trimmed win-x64 host, both raw JsonSerializer AND ASF's reflection-
+///     resolver options threw MissingMethodException for our positional records (live smoke
+///     2026-07-09 - parameterized-ctor binding machinery is not among the "known (used)"
+///     reflection paths ASF's trimming preserves). JsonDocument reading is proven present
+///     (ASF parses bot configs with it on this very host).
 /// </summary>
 internal sealed class FileStateStore(string filePath, IIdleLog log) : IStateStore {
 	public PersistedState Load() {
@@ -196,17 +200,72 @@ internal sealed class FileStateStore(string filePath, IIdleLog log) : IStateStor
 				return new PersistedState();
 			}
 
-			return File.ReadAllText(filePath).ToJsonObject<PersistedState>() ?? new PersistedState();
+			using JsonDocument document = JsonDocument.Parse(File.ReadAllText(filePath));
+			JsonElement root = document.RootElement;
+
+			PersistedState state = new();
+
+			if (root.TryGetProperty("quarantined", out JsonElement quarantined)) {
+				foreach (JsonElement entry in quarantined.EnumerateArray()) {
+					state.Quarantined.Add(entry.GetUInt32());
+				}
+			}
+
+			if (root.TryGetProperty("observations", out JsonElement observations)) {
+				foreach (JsonProperty entry in observations.EnumerateObject()) {
+					JsonElement fields = entry.Value;
+					state.Observations[uint.Parse(entry.Name, CultureInfo.InvariantCulture)] = new ObservationState(fields[0].GetUInt32(), fields[1].GetUInt32(), fields[2].GetUInt32(), DateTimeOffset.FromUnixTimeSeconds(fields[3].GetInt64()).UtcDateTime);
+				}
+			}
+
+			if (root.TryGetProperty("ledger", out JsonElement ledger)) {
+				foreach (JsonProperty entry in ledger.EnumerateObject()) {
+					JsonElement fields = entry.Value;
+					state.Ledger[uint.Parse(entry.Name, CultureInfo.InvariantCulture)] = new AccrualEntry(fields[0].GetUInt32(), fields[1].GetUInt32());
+				}
+			}
+
+			return state;
 		} catch (Exception e) {
-			log.Warn($"state load failed, starting fresh: {e.Message}");
+			log.Warn($"state load failed, starting fresh: {e}");
 
 			return new PersistedState();
 		}
 	}
 
 	public void Save(PersistedState state) {
+		StringBuilder json = new(256);
+		json.Append("{\"quarantined\":[");
+		json.AppendJoin(',', state.Quarantined.OrderBy(static appID => appID));
+		json.Append("],\"observations\":{");
+
+		bool first = true;
+
+		foreach ((uint appID, ObservationState observed) in state.Observations.OrderBy(static pair => pair.Key)) {
+			if (!first) {
+				json.Append(',');
+			}
+
+			first = false;
+			json.Append(CultureInfo.InvariantCulture, $"\"{appID}\":[{observed.ServerMinutesAtFirstObservation},{observed.CreditedIdleMinutes},{observed.CompletedRotations},{new DateTimeOffset(observed.LastCreditUtc.ToUniversalTime()).ToUnixTimeSeconds()}]");
+		}
+
+		json.Append("},\"ledger\":{");
+		first = true;
+
+		foreach ((uint appID, AccrualEntry entry) in state.Ledger.OrderBy(static pair => pair.Key)) {
+			if (!first) {
+				json.Append(',');
+			}
+
+			first = false;
+			json.Append(CultureInfo.InvariantCulture, $"\"{appID}\":[{entry.ServerBaselineMinutes},{entry.CreditedMinutes}]");
+		}
+
+		json.Append("}}");
+
 		string temp = $"{filePath}.new";
-		File.WriteAllText(temp, state.ToJsonText());
+		File.WriteAllText(temp, json.ToString());
 		File.Move(temp, filePath, true);
 	}
 }
