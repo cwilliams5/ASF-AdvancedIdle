@@ -4,6 +4,11 @@
 # plugin-dev wiki warns about exactly this class for OS-specific ASF builds. Build-time-known
 # values (versions, git sha) belong in generated compile-time constants (HandshakeInfo.g.cs,
 # see AdvancedIdle.csproj GenerateHandshakeInfo) - never in runtime attribute reflection.
+#
+# INCIDENT 2 (same smoke, minutes later): raw JsonSerializer.Serialize threw the same
+# MissingMethodException in state persistence on the same host. JSON in plugin sources goes
+# through ASF's JsonUtilities extensions (ToJsonText / ToJsonObject) - the surface ASF's own
+# SerializableFile runs on trimmed hosts, proven by FreePackages persisting on this install.
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 
@@ -17,6 +22,10 @@ foreach ($f in (@($tracked) + @($untracked))) {
 
     if ($content -match 'GetCustomAttribute') {
         $bad += "$($f): uses attribute reflection (GetCustomAttribute*) - trimmed ASF hosts may lack it"
+    }
+
+    if ($content -match 'JsonSerializer\.(Serialize|Deserialize)') {
+        $bad += "$($f): uses raw JsonSerializer - use ASF's ToJsonText/ToJsonObject (JsonUtilities), the trimmed-host-proven surface"
     }
 }
 

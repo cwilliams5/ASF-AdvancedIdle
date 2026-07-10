@@ -9,6 +9,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using AdvancedIdle.Core;
 using ArchiSteamFarm.Core;
+using ArchiSteamFarm.Helpers.Json;
 using ArchiSteamFarm.Plugins.Interfaces;
 using ArchiSteamFarm.Steam;
 using JetBrains.Annotations;
@@ -178,7 +179,13 @@ internal sealed class SystemClock : IIdleClock {
 	public DateTime UtcNow => DateTime.UtcNow;
 }
 
-/// <summary>Atomic JSON persistence beside the bot's own database file. Rare writes; a corrupt/missing file degrades to fresh state with a warning, never a crash.</summary>
+/// <summary>
+///     Atomic JSON persistence beside the bot's own database file. Rare writes; a corrupt/missing
+///     file degrades to fresh state with a warning, never a crash. Serialization goes through
+///     ASF's JsonUtilities (its own options/resolver), NOT raw JsonSerializer - the trimmed
+///     win-x64 host threw MissingMethodException on the default reflection path (live smoke
+///     2026-07-09), while ASF's surface is what SerializableFile itself runs on such hosts.
+/// </summary>
 internal sealed class FileStateStore(string filePath, IIdleLog log) : IStateStore {
 	public PersistedState Load() {
 		try {
@@ -186,7 +193,7 @@ internal sealed class FileStateStore(string filePath, IIdleLog log) : IStateStor
 				return new PersistedState();
 			}
 
-			return JsonSerializer.Deserialize<PersistedState>(File.ReadAllText(filePath)) ?? new PersistedState();
+			return File.ReadAllText(filePath).ToJsonObject<PersistedState>() ?? new PersistedState();
 		} catch (Exception e) {
 			log.Warn($"state load failed, starting fresh: {e.Message}");
 
@@ -196,7 +203,7 @@ internal sealed class FileStateStore(string filePath, IIdleLog log) : IStateStor
 
 	public void Save(PersistedState state) {
 		string temp = $"{filePath}.new";
-		File.WriteAllText(temp, JsonSerializer.Serialize(state));
+		File.WriteAllText(temp, state.ToJsonText());
 		File.Move(temp, filePath, true);
 	}
 }
