@@ -35,5 +35,8 @@ jobs:
     - name: Verify .NET Core
       run: dotnet --info
 
-    - name: Build ${{ matrix.configuration }}
-      run: dotnet build -c "${{ matrix.configuration }}" -p:ContinuousIntegrationBuild=true -p:UseAppHost=false --nologo
+    # CI runs the SAME gate humans and the AI run locally (test-all.ps1: build ->
+    # pregate -> tests) so the gates cannot drift apart (CLAUDE.md "Build & test").
+    - name: Run the gate (build + pregate + tests)
+      shell: pwsh
+      run: ./test-all.ps1 -Configuration "${{ matrix.configuration }}"
