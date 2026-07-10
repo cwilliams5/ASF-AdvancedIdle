@@ -199,10 +199,13 @@ internal sealed class SystemClock : IIdleClock {
 ///     (ASF parses bot configs with it on this very host).
 /// </summary>
 internal sealed class FileStateStore(string filePath, IIdleLog log) : IStateStore {
-	// Everything below sticks to the most boring BCL surface possible, because a member missing
-	// from the trimmed host throws MissingMethodException at JIT TIME - before this method's own
-	// try/catch exists (live smoke: Load() died at JIT on its first shape, killing the idler).
-	// Callers additionally wrap the call site, where a JIT failure IS catchable.
+	// Plain-text numeric lines, async file APIs. Root cause of three persist failures on the
+	// trimmed win-x64 host: sync File.ReadAllText/WriteAllText do not exist there (ASF uses
+	// only the *Async variants - zero sync call sites in its whole tree), and a missing member
+	// fails the referencing method at JIT TIME, before its own try/catch exists. Every API used
+	// below was observed working on the live host (string.Join appears in ASF's own log lines,
+	// Split/TryParse in command and config parsing, WriteAllTextAsync+Move in SerializableFile).
+	// Callers additionally wrap the call sites, where a JIT failure IS catchable.
 
 	private static readonly DateTime UnixEpoch = new(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
@@ -212,37 +215,39 @@ internal sealed class FileStateStore(string filePath, IIdleLog log) : IStateStor
 				return new PersistedState();
 			}
 
-			using JsonDocument document = JsonDocument.Parse(File.ReadAllText(filePath));
-			JsonElement root = document.RootElement;
-
+			string text = File.ReadAllTextAsync(filePath).GetAwaiter().GetResult();
 			PersistedState state = new();
+			bool sawVersion = false;
 
-			if (root.TryGetProperty("quarantined", out JsonElement quarantined)) {
-				foreach (JsonElement entry in quarantined.EnumerateArray()) {
-					if (entry.TryGetUInt32(out uint appID)) {
+			foreach (string line in text.Split('\n')) {
+				string[] parts = line.Trim().Split(' ');
+
+				switch (parts[0]) {
+					case "v":
+						sawVersion = true;
+
+						break;
+					case "q" when (parts.Length == 2) && uint.TryParse(parts[1], out uint appID):
 						state.Quarantined.Add(appID);
-					}
+
+						break;
+					case "o" when (parts.Length == 6) && uint.TryParse(parts[1], out uint appID) && uint.TryParse(parts[2], out uint serverAtFirst) && uint.TryParse(parts[3], out uint credited) && uint.TryParse(parts[4], out uint rotations) && uint.TryParse(parts[5], out uint unixSeconds):
+						state.Observations[appID] = new ObservationState(serverAtFirst, credited, rotations, UnixEpoch.AddSeconds(unixSeconds));
+
+						break;
+					case "l" when (parts.Length == 4) && uint.TryParse(parts[1], out uint appID) && uint.TryParse(parts[2], out uint baseline) && uint.TryParse(parts[3], out uint credit):
+						state.Ledger[appID] = new AccrualEntry(baseline, credit);
+
+						break;
 				}
 			}
 
-			if (root.TryGetProperty("observations", out JsonElement observations)) {
-				foreach (JsonProperty entry in observations.EnumerateObject()) {
-					uint[] fields = ReadUIntArray(entry.Value, 4);
+			if (!sawVersion) {
+				// The lenient line parser skips garbage silently - a corrupted or foreign file
+				// must still be VISIBLE, not just quietly discarded.
+				log.Warn("state file has no version header (corrupted or foreign), starting fresh");
 
-					if ((fields.Length == 4) && uint.TryParse(entry.Name, out uint appID)) {
-						state.Observations[appID] = new ObservationState(fields[0], fields[1], fields[2], UnixEpoch.AddSeconds(fields[3]));
-					}
-				}
-			}
-
-			if (root.TryGetProperty("ledger", out JsonElement ledger)) {
-				foreach (JsonProperty entry in ledger.EnumerateObject()) {
-					uint[] fields = ReadUIntArray(entry.Value, 2);
-
-					if ((fields.Length == 2) && uint.TryParse(entry.Name, out uint appID)) {
-						state.Ledger[appID] = new AccrualEntry(fields[0], fields[1]);
-					}
-				}
+				return new PersistedState();
 			}
 
 			return state;
@@ -254,69 +259,24 @@ internal sealed class FileStateStore(string filePath, IIdleLog log) : IStateStor
 	}
 
 	public void Save(PersistedState state) {
-		StringBuilder json = new(256);
-		json.Append("{\"quarantined\":[");
-
-		bool first = true;
+		List<string> lines = new(1 + state.Quarantined.Count + state.Observations.Count + state.Ledger.Count) { "v 1" };
 
 		foreach (uint appID in state.Quarantined.OrderBy(static entry => entry)) {
-			if (!first) {
-				json.Append(',');
-			}
-
-			first = false;
-			json.Append(Num(appID));
+			lines.Add("q " + Num(appID));
 		}
-
-		json.Append("],\"observations\":{");
-		first = true;
 
 		foreach ((uint appID, ObservationState observed) in state.Observations.OrderBy(static pair => pair.Key)) {
-			if (!first) {
-				json.Append(',');
-			}
-
-			first = false;
-
 			uint unixSeconds = (uint) Math.Max(0, (observed.LastCreditUtc.ToUniversalTime() - UnixEpoch).TotalSeconds);
-			json.Append('"').Append(Num(appID)).Append("\":[").Append(Num(observed.ServerMinutesAtFirstObservation)).Append(',').Append(Num(observed.CreditedIdleMinutes)).Append(',').Append(Num(observed.CompletedRotations)).Append(',').Append(Num(unixSeconds)).Append(']');
+			lines.Add("o " + Num(appID) + " " + Num(observed.ServerMinutesAtFirstObservation) + " " + Num(observed.CreditedIdleMinutes) + " " + Num(observed.CompletedRotations) + " " + Num(unixSeconds));
 		}
-
-		json.Append("},\"ledger\":{");
-		first = true;
 
 		foreach ((uint appID, AccrualEntry entry) in state.Ledger.OrderBy(static pair => pair.Key)) {
-			if (!first) {
-				json.Append(',');
-			}
-
-			first = false;
-			json.Append('"').Append(Num(appID)).Append("\":[").Append(Num(entry.ServerBaselineMinutes)).Append(',').Append(Num(entry.CreditedMinutes)).Append(']');
+			lines.Add("l " + Num(appID) + " " + Num(entry.ServerBaselineMinutes) + " " + Num(entry.CreditedMinutes));
 		}
-
-		json.Append("}}");
 
 		string temp = $"{filePath}.new";
-		File.WriteAllText(temp, json.ToString());
+		File.WriteAllTextAsync(temp, string.Join("\n", lines)).GetAwaiter().GetResult();
 		File.Move(temp, filePath, true);
-	}
-
-	private static uint[] ReadUIntArray(JsonElement array, int expected) {
-		if (array.ValueKind != JsonValueKind.Array) {
-			return [];
-		}
-
-		List<uint> result = new(expected);
-
-		foreach (JsonElement entry in array.EnumerateArray()) {
-			if (!entry.TryGetUInt32(out uint value)) {
-				return [];
-			}
-
-			result.Add(value);
-		}
-
-		return result.ToArray();
 	}
 
 	private static string Num(uint value) => value.ToString(CultureInfo.InvariantCulture);

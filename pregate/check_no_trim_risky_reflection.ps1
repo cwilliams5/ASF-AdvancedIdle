@@ -27,6 +27,14 @@ foreach ($f in (@($tracked) + @($untracked))) {
     if ($content -match 'JsonSerializer\.(Serialize|Deserialize)') {
         $bad += "$($f): uses raw JsonSerializer - use ASF's ToJsonText/ToJsonObject (JsonUtilities), the trimmed-host-proven surface"
     }
+
+    # INCIDENT 3 (same night, the root cause of three persist failures): the sync file APIs do
+    # not exist on the trimmed host - ASF's tree contains ONLY the *Async variants, so trimming
+    # removed the sync ones, and any method referencing them dies at JIT time. The trailing \(
+    # keeps XxxAsync( calls legal.
+    if ($content -match 'File\.(ReadAllText|WriteAllText|ReadAllLines|WriteAllLines|AppendAllText)\(') {
+        $bad += "$($f): uses a sync File text API - trimmed ASF hosts ship only the *Async variants; bridge with .GetAwaiter().GetResult() at the call site"
+    }
 }
 
 if ($bad.Count -gt 0) {
