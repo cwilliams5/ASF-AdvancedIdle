@@ -2,6 +2,11 @@
 # API key hardcoded in source, plus a hardcoded SteamID64. This repo is written
 # public-shaped from commit #1 (CLAUDE.md), so key-shaped strings are gated mechanically.
 # If a match is a false positive, add the file to the allowlist below WITH a justification.
+#
+# INCIDENT 2 (2026-07-09, this check's first firing): it caught its own failure-message,
+# which contained a matching example ID - checks obey the rules they enforce. Same day it
+# emerged that scanning only `git ls-files` lets a brand-new file ride through the gate
+# into its own first commit, so untracked-but-not-ignored files are scanned too.
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 
@@ -18,7 +23,10 @@ $patterns = @(
     @{ Name = 'GitHub token';                           Regex = '\bgh[pousr]_[A-Za-z0-9]{20,}\b' }
 )
 
-$files = git -C $root ls-files | Where-Object {
+$tracked = git -C $root ls-files
+$untracked = git -C $root ls-files --others --exclude-standard
+
+$files = (@($tracked) + @($untracked)) | Where-Object {
     ($exts -contains [System.IO.Path]::GetExtension($_)) -and ($allow -notcontains $_)
 }
 
@@ -44,7 +52,7 @@ foreach ($f in $files) {
 
 if ($bad.Count -gt 0) {
     $bad | ForEach-Object { Write-Host $_ }
-    Write-Host 'Remove the secret or use a placeholder (user@example.com, 76561190000000000 is NOT a placeholder - use 7656119...X literals never). False positive? Allowlist the file in this check WITH a justification.'
+    Write-Host 'Remove the secret or use an obviously-fake placeholder (user@example.com, 7656119XXXXXXXXXX). False positive? Allowlist the file in this check WITH a justification.'
     exit 1
 }
 

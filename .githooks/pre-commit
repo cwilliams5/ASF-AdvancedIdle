@@ -1,0 +1,11 @@
+#!/bin/sh
+# Pre-commit: run the pregate (seconds). A red pregate cannot be committed past.
+# INCIDENT (2026-07-09): a gate invocation piped through grep swallowed test-all's exit
+# code, the '&&' chain gated on grep instead, and a red-gated commit landed. This hook is
+# the mechanical layer that makes that invocation mistake harmless.
+# Setup (once per clone): git config core.hooksPath .githooks
+# Bypass (--no-verify) is for genuine emergencies only, never routine.
+pwsh -NoProfile -File "$(git rev-parse --show-toplevel)/pregate/pregate.ps1" || {
+    echo "pre-commit: pregate FAILED - commit blocked (see output above)."
+    exit 1
+}

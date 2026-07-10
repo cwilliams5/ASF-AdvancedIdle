@@ -49,6 +49,10 @@ Never hand-edit a generated doc section.
 - `pwsh ./test-all.ps1` is THE gate: build (exit-code checked) → pregate →
   tests. Human, AI, and CI run this same script — run it after every change and
   read the failures yourself; never ask the user to verify what a machine can.
+  Never gate a commit on the gate's output *piped through another command* — a
+  pipe swallows the exit code (that exact mistake landed a red-gated commit
+  once). `git config core.hooksPath .githooks` once per clone: the pre-commit
+  hook re-runs the pregate so a red gate physically can't be committed past.
 - Live-Steam behavior (yielding to real play, farming preemption, profile
   display) is machine-unverifiable — that choreography lives in `SMOKE.md` and
   is a release precondition.

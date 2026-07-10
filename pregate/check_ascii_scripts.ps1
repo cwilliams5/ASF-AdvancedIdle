@@ -6,7 +6,11 @@
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 
-$files = git -C $root ls-files '*.ps1' '*.sh'
+# Untracked-but-not-ignored files scan too: a new script must not ride through the gate
+# into its own first commit (same gap as check_no_secrets INCIDENT 2).
+$tracked = git -C $root ls-files '*.ps1' '*.sh'
+$untracked = git -C $root ls-files --others --exclude-standard '*.ps1' '*.sh'
+$files = @($tracked) + @($untracked)
 $bad = @()
 
 foreach ($f in $files) {
