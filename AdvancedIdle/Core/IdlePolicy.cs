@@ -1,3 +1,5 @@
+using System;
+
 namespace AdvancedIdle.Core;
 
 public enum IdleDecision : byte {
@@ -19,6 +21,8 @@ public sealed record BotSituation(bool Enabled, bool Connected, bool Farming, bo
 /// </summary>
 public static class IdlePolicy {
 	public static IdleDecision Decide(BotSituation situation) {
+		ArgumentNullException.ThrowIfNull(situation);
+
 		if (!situation.Enabled) {
 			return IdleDecision.Disabled;
 		}

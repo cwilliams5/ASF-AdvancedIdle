@@ -10,7 +10,10 @@ Push-Location $PSScriptRoot
 
 try {
     Write-Host "=== [1/3] build ($Configuration) ==="
-    dotnet build -c $Configuration --nologo
+    # ContinuousIntegrationBuild matches the strictness CI/publish builds use (analyzer
+    # severities escalate under it). INCIDENT (2026-07-09): CA1305 + NU1506 passed the local
+    # gate and failed CI - the local gate must never be laxer than the remote one.
+    dotnet build -c $Configuration -p:ContinuousIntegrationBuild=true --nologo
 
     if ($LASTEXITCODE -ne 0) {
         Write-Host 'test-all: BUILD FAILED - stopping'

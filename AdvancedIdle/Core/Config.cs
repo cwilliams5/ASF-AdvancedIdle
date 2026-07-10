@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
@@ -156,7 +157,7 @@ public static class SettingsRegistry {
 		result.AppendLine("|---|---|---|---|");
 
 		foreach (SettingSpec row in Rows) {
-			result.AppendLine($"| `{row.Key}` | {row.TypeText} | `{row.DefaultText}` | {row.Description} |");
+			result.AppendLine(CultureInfo.InvariantCulture, $"| `{row.Key}` | {row.TypeText} | `{row.DefaultText}` | {row.Description} |");
 		}
 
 		result.Append("<!-- CONFIG:END -->");
