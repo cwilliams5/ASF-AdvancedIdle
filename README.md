@@ -39,11 +39,11 @@ a dynamic replacement for the static `GamesPlayedWhileIdle` list.
 
 Per-bot properties, added to the bot's `.json` config (defaults shown):
 
-<!-- CONFIG:BEGIN (generated from Config.cs registry; do not hand-edit once the generator lands) -->
+<!-- CONFIG:BEGIN (generated from Core/Config.cs registry; regenerate via tools/bless.ps1 -Docs) -->
 | Property | Type | Default | Meaning |
 |---|---|---|---|
 | `AdvancedIdleEnabled` | bool | `false` | Master switch for this bot. |
-| `AdvancedIdleBatchSize` | uint | `30` | Games idled at once (1-32; 31 max with a custom name). |
+| `AdvancedIdleBatchSize` | byte | `30` | Games idled at once (1-32; a custom name occupies one slot). |
 | `AdvancedIdleRotationMinutes` | uint | `120` | How often the batch is re-picked. |
 | `AdvancedIdleBlacklist` | uint[] | `[]` | AppIDs never idled (cosmetic or problematic titles). |
 | `AdvancedIdleCustomGameName` | string | `null` | Optional "non-Steam game" label shown alongside the batch. |

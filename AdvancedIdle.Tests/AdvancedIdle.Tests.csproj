@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<ItemGroup>
+		<PackageReference Include="JetBrains.Annotations.Sources" PrivateAssets="all" />
+		<PackageReference Include="MSTest" />
+		<PackageVersion Include="MSTest" Version="4.2.3" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\AdvancedIdle\AdvancedIdle.csproj" />
+		<!-- The plugin references ASF with ExcludeAssets="all" because ASF-the-host provides those
+		     assemblies at runtime. A test host is not ASF, so tests reference ASF directly to copy
+		     the runtime closure (ASF.dll, AspNetCore.*) into the test output - the same pattern as
+		     ASF's own ArchiSteamFarm.Tests. Without this, MSTest discovery dies on type load. -->
+		<ProjectReference Include="..\ArchiSteamFarm\ArchiSteamFarm\ArchiSteamFarm.csproj" />
+	</ItemGroup>
+</Project>

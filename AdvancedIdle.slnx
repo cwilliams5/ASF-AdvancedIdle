@@ -8,4 +8,6 @@
 	<Project Path="ArchiSteamFarm/ArchiSteamFarm/ArchiSteamFarm.csproj" />
 
 	<Project Path="AdvancedIdle/AdvancedIdle.csproj" />
+
+	<Project Path="AdvancedIdle.Tests/AdvancedIdle.Tests.csproj" />
 </Solution>
