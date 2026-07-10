@@ -49,6 +49,7 @@ Per-bot properties, added to the bot's `.json` config (defaults shown):
 | `AdvancedIdleCustomGameName` | string | `null` | Optional "non-Steam game" label shown alongside the batch. |
 | `AdvancedIdleIdleWhileFarmerPaused` | bool | `false` | Also idle while the farmer is paused by user command. |
 | `AdvancedIdleQuarantineEnabled` | bool | `true` | Auto-bench titles that provably never accrue playtime. |
+| `AdvancedIdleHeartbeatReassert` | bool | `false` | Also re-send the unchanged batch every 5 minutes as a self-heal net (friend-visible when a custom name is set); off = transitions and rotations only. |
 <!-- CONFIG:END -->
 
 ## Commands

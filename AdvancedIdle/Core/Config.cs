@@ -24,6 +24,14 @@ public sealed record IdleConfig {
 	public bool IdleWhileFarmerPaused { get; init; }
 	public bool QuarantineEnabled { get; init; } = true;
 
+	/// <summary>
+	///     Opt-in periodic re-send of the UNCHANGED batch as a self-healing net. Off by default:
+	///     every witnessed session-clobber arrives with an event we already hook, rotation bounds
+	///     any hypothetical silent one, and with a custom name each send is friend-visible (the
+	///     clean-session dance) - speculative armor that proved socially expensive (2026-07-10).
+	/// </summary>
+	public bool HeartbeatReassert { get; init; }
+
 	/// <summary>A custom display name occupies one of the 32 slots (upstream-notes: PlayGames cap eviction), so it caps the batch at 31.</summary>
 	public byte EffectiveBatchSize => (byte) Math.Min(BatchSize, string.IsNullOrEmpty(CustomGameName) ? MaxGamesPlayedConcurrently : MaxGamesPlayedConcurrently - 1);
 }
@@ -105,6 +113,10 @@ public static class SettingsRegistry {
 		new(
 			$"{KeyPrefix}QuarantineEnabled", "bool", "true", "Auto-bench titles that provably never accrue playtime.",
 			static (value, config) => TryBool(value, out bool parsed) ? (config with { QuarantineEnabled = parsed }, null) : Fail("expected a bool")
+		),
+		new(
+			$"{KeyPrefix}HeartbeatReassert", "bool", "false", "Also re-send the unchanged batch every 5 minutes as a self-heal net (friend-visible when a custom name is set); off = transitions and rotations only.",
+			static (value, config) => TryBool(value, out bool parsed) ? (config with { HeartbeatReassert = parsed }, null) : Fail("expected a bool")
 		)
 	];
 

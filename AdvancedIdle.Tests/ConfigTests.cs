@@ -24,7 +24,7 @@ internal sealed class ConfigTests {
 
 	[TestMethod]
 	public void AllKeysParse() {
-		(IdleConfig config, IReadOnlyList<string> errors) = Parse("""{"AdvancedIdleEnabled":true,"AdvancedIdleBatchSize":10,"AdvancedIdleRotationMinutes":30,"AdvancedIdleBlacklist":[440,570],"AdvancedIdleCustomGameName":"resting","AdvancedIdleIdleWhileFarmerPaused":true,"AdvancedIdleQuarantineEnabled":false}""");
+		(IdleConfig config, IReadOnlyList<string> errors) = Parse("""{"AdvancedIdleEnabled":true,"AdvancedIdleBatchSize":10,"AdvancedIdleRotationMinutes":30,"AdvancedIdleBlacklist":[440,570],"AdvancedIdleCustomGameName":"resting","AdvancedIdleIdleWhileFarmerPaused":true,"AdvancedIdleQuarantineEnabled":false,"AdvancedIdleHeartbeatReassert":true}""");
 
 		Assert.AreEqual(0, errors.Count, string.Join("; ", errors));
 		Assert.IsTrue(config.Enabled);
@@ -34,6 +34,14 @@ internal sealed class ConfigTests {
 		Assert.AreEqual("resting", config.CustomGameName);
 		Assert.IsTrue(config.IdleWhileFarmerPaused);
 		Assert.IsFalse(config.QuarantineEnabled);
+		Assert.IsTrue(config.HeartbeatReassert);
+	}
+
+	[TestMethod]
+	public void HeartbeatReassertDefaultsOff() {
+		(IdleConfig config, _) = Parse("""{"AdvancedIdleEnabled":true}""");
+
+		Assert.IsFalse(config.HeartbeatReassert);
 	}
 
 	[TestMethod]

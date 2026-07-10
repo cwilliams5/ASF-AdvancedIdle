@@ -170,14 +170,16 @@ public sealed class BotIdler : IDisposable {
 				SettleCredit(now);
 			}
 
-			// Re-assert: one cheap idempotent CM message. Forced on transitions (ASF wrote over
-			// us); on the heartbeat it self-heals any transition we missed (e.g. ASF's event-less
-			// ResetGamesPlayed path, upstream-notes). Forced sends respect the echo-loop floor.
-			bool windowElapsed = (now - LastSendUtc).TotalMinutes >= ReassertMinutes;
+			// Re-assert: one cheap idempotent re-send of the UNCHANGED batch (selection happens
+			// only at rotation). Forced on transitions (ASF wrote over us; load-bearing). The
+			// periodic heartbeat variant is opt-in (config rationale in Core/Config.cs) - the
+			// timer itself always runs, since it drives rotation timing. Forced sends respect
+			// the echo-loop floor.
+			bool heartbeatWindowElapsed = Config.HeartbeatReassert && ((now - LastSendUtc).TotalMinutes >= ReassertMinutes);
 			bool forcedOutsideFloor = forceReassert && ((now - LastSendUtc).TotalSeconds >= MinSecondsBetweenForcedSends);
 
-			if ((CurrentBatch.Count > 0) && (windowElapsed || forcedOutsideFloor)) {
-				await Send(now, $"re-assert ({reason})").ConfigureAwait(false);
+			if ((CurrentBatch.Count > 0) && (heartbeatWindowElapsed || forcedOutsideFloor)) {
+				await Send(now, $"re-assert same batch ({reason})").ConfigureAwait(false);
 			}
 		} catch (Exception e) {
 			// Timer callbacks discard this task - without this catch, a throw anywhere in the

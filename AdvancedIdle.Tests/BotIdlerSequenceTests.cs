@@ -44,17 +44,23 @@ internal sealed class BotIdlerSequenceTests {
 		Assert.AreEqual(1, steam.Sends.Count);
 
 		// Farming ends 1 minute later: a transition FORCES the re-assert - ASF just overwrote the
-		// session with its own idle write, so waiting out the heartbeat window means minutes of
-		// the wrong games (witnessed live: the static GPWI list held the session for 5 minutes).
+		// session with its own idle write, so waiting for rotation means up to a window of the
+		// wrong games (witnessed live: the static GPWI list held the session for 5 minutes).
 		state.Farming = false;
 		clock.Advance(TimeSpan.FromMinutes(1));
 		await idler.Pump("farming finished", forceReassert: true).ConfigureAwait(false);
 		Assert.AreEqual(2, steam.Sends.Count);
 		CollectionAssert.AreEqual(new[] { 1u, 2u, 3u }, steam.Sends[1].AppIds);
 
+		// Heartbeat with HeartbeatReassert off (the default): window elapsed, nothing sent -
+		// periodic re-sends are opt-in (friend-visible with a custom name; rotation is the net).
+		clock.Advance(TimeSpan.FromMinutes(6));
+		await idler.Pump("heartbeat").ConfigureAwait(false);
+		Assert.AreEqual(2, steam.Sends.Count);
+
 		// Past the rotation window -> new batch; local accrual credit must have lifted the idled
 		// three above the untouched two even though the server (fake) never reported progress.
-		clock.Advance(TimeSpan.FromMinutes(64));
+		clock.Advance(TimeSpan.FromMinutes(58));
 		await idler.Pump("heartbeat").ConfigureAwait(false);
 		Assert.AreEqual(3, steam.Sends.Count);
 		CollectionAssert.AreEqual(new[] { 4u, 5u, 1u }, steam.Sends[2].AppIds);
