@@ -107,8 +107,13 @@ pattern): quarantine set + rotation/accrual bookkeeping. Survives restarts (SMOK
   upstream wire behavior + unified owned-games keeping playtime), BotIdler orchestrator
   behind seams (pure IdlePolicy + fake-driven sequence test), `!aidle` commands
   (status/rotate/quarantine/unquarantine), atomic JSON persistence beside the bot db.
-- **Phase 3 — live smoke.** [USER-GATED: needs the real ASF install + account] Run
-  SMOKE.md; watch the quarantine detection for real sticky-zeros; tune debounces.
+- **Phase 3 — live smoke.** MOSTLY DONE (2026-07-09 overnight, user-blessed unattended run
+  on the real ASF; evidence: `docs/smoke-2026-07-09.md`). Passed: handshake, went-idle
+  assert, rotation-on-schedule, config hot-reload, restart resilience, persistence,
+  coexistence with static GPWI + FreePackages; fixed live: forced transition re-asserts +
+  the trimmed-host (win-x64) API saga. Remaining [USER-GATED]: real card-drop preemption,
+  human-at-keyboard yield test, `!aidle` command spot-checks, custom-name display,
+  quarantine watching for real sticky-zeros over the coming days.
 - **Phase 4 — release + visibility.** [USER-GATED] Exercise /release end-to-end (tag ->
   CI zip -> install), decide public, enable ASF plugin auto-update if public.
 
