@@ -33,14 +33,12 @@ internal sealed class AdvancedIdlePlugin : IGitHubPluginUpdates, IBot, IBotModul
 	public Version Version => typeof(AdvancedIdlePlugin).Assembly.GetName().Version ?? throw new InvalidOperationException(nameof(Version));
 
 	public Task OnLoaded() {
-		Assembly assembly = typeof(AdvancedIdlePlugin).Assembly;
-
 		// The version handshake (SMOKE.md step 1): this line alone identifies a stale DLL.
-		string informational = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "unknown";
-		string builtAgainst = assembly.GetCustomAttributes<AssemblyMetadataAttribute>().FirstOrDefault(static attribute => attribute.Key == "BuiltAgainstASF")?.Value ?? "unknown";
+		// Compile-time constants, NOT attribute reflection: the trimmed win-x64 ASF host lacks
+		// the reflection-extension surface (MissingMethodException here, live smoke 2026-07-09).
 		Version? runningAsf = typeof(ASF).Assembly.GetName().Version;
 
-		ASF.ArchiLogger.LogGenericInfo($"AdvancedIdle {informational} | built against ASF {builtAgainst} | running on ASF {runningAsf}");
+		ASF.ArchiLogger.LogGenericInfo($"AdvancedIdle {HandshakeInfo.InformationalVersion} | built against ASF {HandshakeInfo.BuiltAgainstAsf} | running on ASF {runningAsf}");
 
 		return Task.CompletedTask;
 	}
