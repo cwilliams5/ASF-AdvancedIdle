@@ -92,13 +92,21 @@ pattern): quarantine set + rotation/accrual bookkeeping. Survives restarts (SMOK
 
 ## Phases
 
-- **Phase 0 — scaffold + cage.** Template instantiated (repo `cwilliams5/ASF-AdvancedIdle`,
-  ASF pinned 6.3.7.0), rename done, first build green. CLAUDE.md, pregate runner + 4
+- **Phase 0 — scaffold + cage.** DONE (2026-07-09). Template instantiated (repo
+  `cwilliams5/ASF-AdvancedIdle`, ASF pinned 6.3.7.0), CLAUDE.md, pregate runner + 4
   checks, test-all, CI rewired to the gate, README, SMOKE.md, /release skill, this plan.
-- **Phase 1 — pure core + tests.** Config registry + parser, selection, quarantine,
-  accrual; xunit test project wired into the slnx; rotation-trace baseline blessed.
-- **Phase 2 — ASF shell.** Plugin class (interfaces + version-handshake log line),
-  handler (send + owned-games), orchestrator wiring, `!aidle` commands, persistence.
+  Post-hoc additions from live incidents: pre-commit hook (pipe-swallowed gate exit),
+  untracked-file scan coverage, secrets check self-violation fix.
+- **Phase 1 — pure core + tests.** DONE (2026-07-09). Config registry + parser,
+  selection, accrual, quarantine; MSTest project (mirrors ASF's own test stack) wired
+  into the slnx; README docs-freshness oracle + rotation-trace baseline blessed and
+  read-verified (sticky-zero benched at r4, lag rotations bench nothing, floor raised
+  417..536 from 0..239).
+- **Phase 2 — ASF shell.** DONE (2026-07-09). Plugin class (7 interfaces +
+  version-handshake OnLoaded line), AdvancedIdleHandler (games-played send replicating
+  upstream wire behavior + unified owned-games keeping playtime), BotIdler orchestrator
+  behind seams (pure IdlePolicy + fake-driven sequence test), `!aidle` commands
+  (status/rotate/quarantine/unquarantine), atomic JSON persistence beside the bot db.
 - **Phase 3 — live smoke.** [USER-GATED: needs the real ASF install + account] Run
   SMOKE.md; watch the quarantine detection for real sticky-zeros; tune debounces.
 - **Phase 4 — release + visibility.** [USER-GATED] Exercise /release end-to-end (tag ->
