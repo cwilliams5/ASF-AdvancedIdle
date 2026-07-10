@@ -2,19 +2,19 @@
 	<Import Project="ArchiSteamFarm/Directory.Build.props" />
 
 	<PropertyGroup>
-		<PluginName>MyAwesomePlugin</PluginName>
-		<Version>1.0.0.0</Version>
+		<PluginName>AdvancedIdle</PluginName>
+		<Version>0.1.0.0</Version>
 	</PropertyGroup>
 
 	<PropertyGroup>
 		<ApplicationIcon />
-		<Authors>YourName</Authors>
+		<Authors>cwilliams5</Authors>
 		<Company>$(Authors)</Company>
 		<Copyright>Copyright © $([System.DateTime]::UtcNow.Year) $(Company)</Copyright>
-		<Description>$(PluginName) description.</Description>
+		<Description>ArchiSteamFarm plugin that idles your least-played owned games whenever the bot has nothing to farm, rotating the batch so playtime spreads evenly across your whole library.</Description>
 		<PackageIcon />
 		<PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
-		<PackageProjectUrl>https://github.com/$(Company)/$(PluginName)</PackageProjectUrl>
+		<PackageProjectUrl>https://github.com/cwilliams5/ASF-AdvancedIdle</PackageProjectUrl>
 		<PackageReleaseNotes>$(PackageProjectUrl)/releases</PackageReleaseNotes>
 		<RepositoryUrl>$(PackageProjectUrl).git</RepositoryUrl>
 	</PropertyGroup>

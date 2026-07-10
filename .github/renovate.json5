@@ -9,7 +9,7 @@
 		":disableDependencyDashboard",
 		":disableRateLimiting",
 		":label(🤖 Automatic)",
-		":reviewer(JustArchi)"
+		":reviewer(cwilliams5)"
 	],
 
 	"git-submodules": {
