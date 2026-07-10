@@ -15,8 +15,9 @@ namespace AdvancedIdle.Tests;
 ///     baseline - the layer that catches "correct refactoring logic with incorrect ripple
 ///     effects" in the core, which unit tests miss.
 /// </summary>
+#pragma warning disable CA1812 // instantiated by MSTest via [assembly: DiscoverInternals]
 [TestClass]
-public sealed class RotationTraceTests {
+internal sealed class RotationTraceTests {
 	private const uint StickyAppId = 1013; // never accrues server-side (the VaporChill-era failure class)
 
 	[TestMethod]

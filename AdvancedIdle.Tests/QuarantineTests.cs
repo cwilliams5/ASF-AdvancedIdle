@@ -5,8 +5,9 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace AdvancedIdle.Tests;
 
+#pragma warning disable CA1812 // instantiated by MSTest via [assembly: DiscoverInternals]
 [TestClass]
-public sealed class QuarantineTests {
+internal sealed class QuarantineTests {
 	private static readonly QuarantineRules Rules = QuarantineRules.Default;
 
 	[TestMethod]

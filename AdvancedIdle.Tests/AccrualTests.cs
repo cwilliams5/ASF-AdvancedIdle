@@ -4,8 +4,9 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace AdvancedIdle.Tests;
 
+#pragma warning disable CA1812 // instantiated by MSTest via [assembly: DiscoverInternals]
 [TestClass]
-public sealed class AccrualTests {
+internal sealed class AccrualTests {
 	[TestMethod]
 	public void CreditCreatesAndAccumulates() {
 		IReadOnlyDictionary<uint, AccrualEntry> ledger = new Dictionary<uint, AccrualEntry>();

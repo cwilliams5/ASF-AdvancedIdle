@@ -6,8 +6,9 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace AdvancedIdle.Tests;
 
+#pragma warning disable CA1812 // instantiated by MSTest via [assembly: DiscoverInternals]
 [TestClass]
-public sealed class DocsFreshnessTests {
+internal sealed class DocsFreshnessTests {
 	[TestMethod]
 	public void ReadmeConfigSectionMatchesRegistry() {
 		string readmePath = Path.Combine(TestPaths.RepoRoot(), "README.md");

@@ -73,7 +73,7 @@ internal sealed class AdvancedIdlePlugin : IGitHubPluginUpdates, IBot, IBotModul
 
 		// Covers the one ASF transition with no plugin event (upstream-notes "the one uncovered
 		// transition"): account freed, farmer declines to resume, ResetGamesPlayed runs silently.
-		callbackManager.Subscribe<SteamUser.PlayingSessionStateCallback>(_ => PumpSoon(bot, PostTransitionDelayMs, "playing-session change"));
+		callbackManager.Subscribe<SteamUser.PlayingSessionStateCallback>(_ => PumpSoon(bot, PostTransitionDelayMs, "playing-session change", true));
 
 		return Task.CompletedTask;
 	}
@@ -118,13 +118,16 @@ internal sealed class AdvancedIdlePlugin : IGitHubPluginUpdates, IBot, IBotModul
 		return Task.CompletedTask;
 	}
 
+	// Transition triggers force the re-assert: ASF's ResetGamesPlayed has just (re)written the
+	// session over us (live smoke: their GamesPlayedWhileIdle held the session for 5 minutes
+	// until the heartbeat took it back).
 	public Task OnBotFarmingStarted(Bot bot) => PumpSoon(bot, 0, "farming started");
 
-	public Task OnBotFarmingStopped(Bot bot) => PumpSoon(bot, PostTransitionDelayMs, "farming stopped");
+	public Task OnBotFarmingStopped(Bot bot) => PumpSoon(bot, PostTransitionDelayMs, "farming stopped", true);
 
-	public Task OnBotFarmingFinished(Bot bot, bool farmedSomething) => PumpSoon(bot, PostTransitionDelayMs, "farming finished");
+	public Task OnBotFarmingFinished(Bot bot, bool farmedSomething) => PumpSoon(bot, PostTransitionDelayMs, "farming finished", true);
 
-	public Task OnBotLoggedOn(Bot bot) => PumpSoon(bot, LogonSettleDelayMs, "logged on");
+	public Task OnBotLoggedOn(Bot bot) => PumpSoon(bot, LogonSettleDelayMs, "logged on", true);
 
 	public Task OnBotDisconnected(Bot bot, EResult reason) => PumpSoon(bot, 0, "disconnected");
 
@@ -135,7 +138,7 @@ internal sealed class AdvancedIdlePlugin : IGitHubPluginUpdates, IBot, IBotModul
 		return await IdleCommands.Handle(bot, Idlers, access, args).ConfigureAwait(false);
 	}
 
-	private static Task PumpSoon(Bot bot, int delayMs, string reason) {
+	private static Task PumpSoon(Bot bot, int delayMs, string reason, bool forceReassert = false) {
 		ArgumentNullException.ThrowIfNull(bot);
 
 		if (Idlers.TryGetValue(bot.BotName, out BotIdler? idler)) {
@@ -144,7 +147,7 @@ internal sealed class AdvancedIdlePlugin : IGitHubPluginUpdates, IBot, IBotModul
 						await Task.Delay(delayMs).ConfigureAwait(false);
 					}
 
-					await idler.Pump(reason).ConfigureAwait(false);
+					await idler.Pump(reason, forceReassert).ConfigureAwait(false);
 				}
 			);
 		}

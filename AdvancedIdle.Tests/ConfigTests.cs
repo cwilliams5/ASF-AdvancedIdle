@@ -7,8 +7,9 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace AdvancedIdle.Tests;
 
+#pragma warning disable CA1812 // instantiated by MSTest via [assembly: DiscoverInternals]
 [TestClass]
-public sealed class ConfigTests {
+internal sealed class ConfigTests {
 	[TestMethod]
 	public void NullPropertiesYieldDefaults() {
 		(IdleConfig config, IReadOnlyList<string> errors) = SettingsRegistry.Parse(null);

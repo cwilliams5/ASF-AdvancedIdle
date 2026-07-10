@@ -39,4 +39,4 @@ jobs:
     # pregate -> tests) so the gates cannot drift apart (CLAUDE.md "Build & test").
     - name: Run the gate (build + pregate + tests)
       shell: pwsh
-      run: ./test-all.ps1 -Configuration "${{ matrix.configuration }}"
+      run: ./test-all.ps1 -Configurations "${{ matrix.configuration }}"

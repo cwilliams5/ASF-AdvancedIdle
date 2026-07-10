@@ -5,8 +5,9 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace AdvancedIdle.Tests;
 
+#pragma warning disable CA1812 // instantiated by MSTest via [assembly: DiscoverInternals]
 [TestClass]
-public sealed class SelectionTests {
+internal sealed class SelectionTests {
 	private static readonly IReadOnlyDictionary<uint, AccrualEntry> NoAccrual = new Dictionary<uint, AccrualEntry>();
 
 	[TestMethod]

@@ -17,6 +17,7 @@ public sealed class BotIdler : IDisposable {
 	private const uint HeartbeatMinutes = 5;
 	private const uint ReassertMinutes = 5;
 	private const double CompletedRotationFraction = 0.9;
+	private static readonly TimeSpan FetchTimeout = TimeSpan.FromSeconds(90);
 
 	private readonly IIdleClock Clock;
 	private readonly IdleConfig Config;
@@ -109,8 +110,14 @@ public sealed class BotIdler : IDisposable {
 		}
 	}
 
-	/// <summary>The single mover. Safe to call from any event, any time, any number of times.</summary>
-	public async Task Pump(string reason) {
+	/// <summary>
+	///     The single mover. Safe to call from any event, any time, any number of times.
+	///     <paramref name="forceReassert" /> is passed by transition triggers (farming stopped,
+	///     account freed, logon): ASF's own ResetGamesPlayed has just overwritten the session
+	///     (live smoke: their GamesPlayedWhileIdle held for 5 minutes until the heartbeat), so
+	///     the re-assert must not wait for the heartbeat window.
+	/// </summary>
+	public async Task Pump(string reason, bool forceReassert = false) {
 		if (Disposed) {
 			return;
 		}
@@ -147,11 +154,17 @@ public sealed class BotIdler : IDisposable {
 				SettleCredit(now);
 			}
 
-			// Re-assert heartbeat: one cheap idempotent CM message self-heals any transition we
-			// missed (e.g. ASF's event-less ResetGamesPlayed path, upstream-notes).
-			if ((CurrentBatch.Count > 0) && ((now - LastSendUtc).TotalMinutes >= ReassertMinutes)) {
+			// Re-assert: one cheap idempotent CM message. Forced on transitions (ASF wrote over
+			// us); on the heartbeat it self-heals any transition we missed (e.g. ASF's event-less
+			// ResetGamesPlayed path, upstream-notes).
+			if ((CurrentBatch.Count > 0) && (forceReassert || ((now - LastSendUtc).TotalMinutes >= ReassertMinutes))) {
 				await Send(now, $"re-assert ({reason})").ConfigureAwait(false);
 			}
+		} catch (Exception e) {
+			// Timer callbacks discard this task - without this catch, a throw anywhere in the
+			// pump would be completely invisible (no log, no crash) and unfixable from the field.
+			// Silence is not success.
+			Log.Warn($"pump crashed ({reason}): {e}");
 		} finally {
 			Sync.Release();
 		}
@@ -177,14 +190,18 @@ public sealed class BotIdler : IDisposable {
 		TenureCreditedMinutes = 0;
 
 		// Fresh snapshot; on failure keep the stale one (selection tolerates, retry next pump).
-		IReadOnlyList<GameSnapshot>? fetched = await Steam.FetchOwnedGames().ConfigureAwait(false);
+		// Bounded wait: SteamKit jobs can heartbeat-extend indefinitely, and an unbounded await
+		// here would hold the pump semaphore (and thus all idling) hostage to one flaky call.
+		Task<IReadOnlyList<GameSnapshot>?> fetchTask = Steam.FetchOwnedGames();
+		Task finished = await Task.WhenAny(fetchTask, Task.Delay(FetchTimeout)).ConfigureAwait(false);
+		IReadOnlyList<GameSnapshot>? fetched = finished == fetchTask ? await fetchTask.ConfigureAwait(false) : null;
 
 		if (fetched is { Count: > 0 }) {
 			Library = fetched;
 			SnapshotUtc = now;
-			Ledger = Accrual.Reconcile(Ledger, Library.ToDictionary(static game => game.AppId, static game => game.PlaytimeForeverMinutes));
+			Ledger = Accrual.Reconcile(Ledger, BuildReported());
 		} else {
-			Log.Warn("owned-games fetch failed, using previous snapshot");
+			Log.Warn(finished == fetchTask ? "owned-games fetch failed, using previous snapshot" : "owned-games fetch timed out, using previous snapshot");
 		}
 
 		if (Library.Count == 0) {
@@ -208,7 +225,7 @@ public sealed class BotIdler : IDisposable {
 		CurrentBatch = batch;
 		BatchAssertedUtc = now;
 
-		Dictionary<uint, uint> reported = Library.ToDictionary(static game => game.AppId, static game => game.PlaytimeForeverMinutes);
+		Dictionary<uint, uint> reported = BuildReported();
 
 		foreach (uint appID in batch) {
 			if (!Observations.ContainsKey(appID)) {
@@ -239,7 +256,7 @@ public sealed class BotIdler : IDisposable {
 			return;
 		}
 
-		Dictionary<uint, uint> reported = Library.ToDictionary(static game => game.AppId, static game => game.PlaytimeForeverMinutes);
+		Dictionary<uint, uint> reported = BuildReported();
 		Ledger = Accrual.Credit(Ledger, CurrentBatch, minutes, appID => reported.GetValueOrDefault(appID));
 		TenureCreditedMinutes += minutes;
 
@@ -258,8 +275,7 @@ public sealed class BotIdler : IDisposable {
 			pair => new ObservedApp(pair.Value.ServerMinutesAtFirstObservation, pair.Value.CreditedIdleMinutes, pair.Value.CompletedRotations, (uint) Math.Max(0, (now - pair.Value.LastCreditUtc).TotalMinutes))
 		);
 
-		Dictionary<uint, uint> reported = Library.ToDictionary(static game => game.AppId, static game => game.PlaytimeForeverMinutes);
-		QuarantineDecision decision = Quarantine.Evaluate(observed, reported, QuarantineRules.Default);
+		QuarantineDecision decision = Quarantine.Evaluate(observed, BuildReported(), QuarantineRules.Default);
 
 		if (decision.AnomalyDetected) {
 			Log.Warn($"quarantine anomaly guard tripped: majority of {decision.EvaluatedCount} evaluated titles report zero accrual - suspecting playtime-data lag or a broken idle session, benching nothing");
@@ -278,6 +294,21 @@ public sealed class BotIdler : IDisposable {
 
 		Log.Warn($"quarantined {decision.ToQuarantine.Count} never-accruing title(s): {string.Join(",", decision.ToQuarantine)} (inspect: !aidle quarantine; undo: !aidle unquarantine)");
 		Persist();
+	}
+
+	/// <summary>
+	///     Dup-safe library index (keep the max playtime on duplicates). ToDictionary would throw
+	///     on a duplicate appID, and nothing guarantees Steam's 30k-game response never repeats
+	///     one - a wire response is not a place to assume uniqueness invariants.
+	/// </summary>
+	private Dictionary<uint, uint> BuildReported() {
+		Dictionary<uint, uint> reported = new(Library.Count);
+
+		foreach (GameSnapshot game in Library) {
+			reported[game.AppId] = reported.TryGetValue(game.AppId, out uint existing) ? Math.Max(existing, game.PlaytimeForeverMinutes) : game.PlaytimeForeverMinutes;
+		}
+
+		return reported;
 	}
 
 	private void Persist() {

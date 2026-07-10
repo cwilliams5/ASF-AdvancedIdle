@@ -3,8 +3,9 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace AdvancedIdle.Tests;
 
+#pragma warning disable CA1812 // instantiated by MSTest via [assembly: DiscoverInternals]
 [TestClass]
-public sealed class IdlePolicyTests {
+internal sealed class IdlePolicyTests {
 	[TestMethod]
 	public void GuardOrderIsLoadBearing() {
 		// Disabled beats everything.

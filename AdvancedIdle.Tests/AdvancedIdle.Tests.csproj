@@ -1,4 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<!-- CA1861 (hoist constant array args to static fields) trades test readability for a
+		     perf concern tests don't have - expectation literals stay inline. Tests only. -->
+		<NoWarn>$(NoWarn);CA1861</NoWarn>
+	</PropertyGroup>
+
 	<ItemGroup>
 		<PackageReference Include="JetBrains.Annotations.Sources" PrivateAssets="all" />
 		<!-- Version comes from ASF's central Directory.Packages.props (imported via ours). -->

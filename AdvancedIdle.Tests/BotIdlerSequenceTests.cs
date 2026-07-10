@@ -12,8 +12,9 @@ namespace AdvancedIdle.Tests;
 ///     Event sequences from docs/upstream-notes.md replayed against the orchestrator through its
 ///     seams (fake clock, fake Steam, fake bot state) - no timers, Pump driven directly.
 /// </summary>
+#pragma warning disable CA1812 // instantiated by MSTest via [assembly: DiscoverInternals]
 [TestClass]
-public sealed class BotIdlerSequenceTests {
+internal sealed class BotIdlerSequenceTests {
 	[TestMethod]
 	public async Task FullLifecycle() {
 		FakeClock clock = new() { UtcNow = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc) };
@@ -33,43 +34,45 @@ public sealed class BotIdlerSequenceTests {
 		using BotIdler idler = new(config, state, steam, new MemoryStore(), new ListLog(), clock, startHeartbeat: false);
 
 		// Went idle (farming finished) -> first rotation asserts the three lowest.
-		await idler.Pump("farming finished");
+		await idler.Pump("farming finished").ConfigureAwait(false);
 		Assert.AreEqual(1, steam.Sends.Count);
 		CollectionAssert.AreEqual(new[] { 1u, 2u, 3u }, steam.Sends[0].AppIds);
 
 		// Farming starts -> stand down, no send.
 		state.Farming = true;
-		await idler.Pump("farming started");
+		await idler.Pump("farming started").ConfigureAwait(false);
 		Assert.AreEqual(1, steam.Sends.Count);
 
-		// Farming ends 10 minutes later -> rotation not due, but the re-assert heartbeat sends the same batch.
+		// Farming ends 1 minute later: a transition FORCES the re-assert - ASF just overwrote the
+		// session with its own idle write, so waiting out the heartbeat window means minutes of
+		// the wrong games (witnessed live: the static GPWI list held the session for 5 minutes).
 		state.Farming = false;
-		clock.Advance(TimeSpan.FromMinutes(10));
-		await idler.Pump("farming finished");
+		clock.Advance(TimeSpan.FromMinutes(1));
+		await idler.Pump("farming finished", forceReassert: true).ConfigureAwait(false);
 		Assert.AreEqual(2, steam.Sends.Count);
 		CollectionAssert.AreEqual(new[] { 1u, 2u, 3u }, steam.Sends[1].AppIds);
 
 		// Past the rotation window -> new batch; local accrual credit must have lifted the idled
 		// three above the untouched two even though the server (fake) never reported progress.
-		clock.Advance(TimeSpan.FromMinutes(55));
-		await idler.Pump("heartbeat");
+		clock.Advance(TimeSpan.FromMinutes(64));
+		await idler.Pump("heartbeat").ConfigureAwait(false);
 		Assert.AreEqual(3, steam.Sends.Count);
 		CollectionAssert.AreEqual(new[] { 4u, 5u, 1u }, steam.Sends[2].AppIds);
 
-		// Playing elsewhere -> stand down; freed -> re-assert without waiting for rotation.
+		// Playing elsewhere -> stand down; freed 2 minutes later -> forced re-assert, no window wait.
 		state.PlayingPossible = false;
-		await idler.Pump("playing-session change");
+		await idler.Pump("playing-session change", forceReassert: true).ConfigureAwait(false);
 		Assert.AreEqual(3, steam.Sends.Count);
 
 		state.PlayingPossible = true;
-		clock.Advance(TimeSpan.FromMinutes(6));
-		await idler.Pump("playing-session change");
+		clock.Advance(TimeSpan.FromMinutes(2));
+		await idler.Pump("playing-session change", forceReassert: true).ConfigureAwait(false);
 		Assert.AreEqual(4, steam.Sends.Count);
 		CollectionAssert.AreEqual(new[] { 4u, 5u, 1u }, steam.Sends[3].AppIds);
 
 		// Disabled config never sends.
 		using BotIdler disabled = new(IdleConfig.Default, state, steam, new MemoryStore(), new ListLog(), clock, startHeartbeat: false);
-		await disabled.Pump("anything");
+		await disabled.Pump("anything").ConfigureAwait(false);
 		Assert.AreEqual(4, steam.Sends.Count);
 	}
 
