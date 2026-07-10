@@ -17,6 +17,10 @@ public sealed class BotIdler : IDisposable {
 	private const uint HeartbeatMinutes = 5;
 	private const uint ReassertMinutes = 5;
 	private const double CompletedRotationFraction = 0.9;
+
+	/// <summary>Defense-in-depth against send-echo feedback (witnessed 2026-07-10: unfiltered playing-session echoes produced a 2-second re-assert loop). Even if a new echo path appears, forced sends cannot exceed one per this floor.</summary>
+	private const uint MinSecondsBetweenForcedSends = 30;
+
 	private static readonly TimeSpan FetchTimeout = TimeSpan.FromSeconds(90);
 
 	private readonly IIdleClock Clock;
@@ -168,8 +172,11 @@ public sealed class BotIdler : IDisposable {
 
 			// Re-assert: one cheap idempotent CM message. Forced on transitions (ASF wrote over
 			// us); on the heartbeat it self-heals any transition we missed (e.g. ASF's event-less
-			// ResetGamesPlayed path, upstream-notes).
-			if ((CurrentBatch.Count > 0) && (forceReassert || ((now - LastSendUtc).TotalMinutes >= ReassertMinutes))) {
+			// ResetGamesPlayed path, upstream-notes). Forced sends respect the echo-loop floor.
+			bool windowElapsed = (now - LastSendUtc).TotalMinutes >= ReassertMinutes;
+			bool forcedOutsideFloor = forceReassert && ((now - LastSendUtc).TotalSeconds >= MinSecondsBetweenForcedSends);
+
+			if ((CurrentBatch.Count > 0) && (windowElapsed || forcedOutsideFloor)) {
 				await Send(now, $"re-assert ({reason})").ConfigureAwait(false);
 			}
 		} catch (Exception e) {

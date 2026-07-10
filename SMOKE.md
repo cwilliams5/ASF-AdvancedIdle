@@ -31,3 +31,8 @@ part can be pushed down into a check or unit test.
    state (log line), no duplicate timers (only one rotation heartbeat firing afterward).
 10. **Restart resilience.** Restart ASF: quarantine and accrual state survived
     (persisted file), batch re-asserts on logon.
+11. **No send-echo loop.** With `AdvancedIdleCustomGameName` SET (the custom-name
+    clean-session dance makes every assert flip session state twice), watch >= 10 minutes:
+    after the initial transition burst, sends happen only on real transitions and the
+    5-minute heartbeat - never a self-sustaining re-assert loop (witnessed 2026-07-10:
+    2-second loop from unfiltered playing-session echoes).

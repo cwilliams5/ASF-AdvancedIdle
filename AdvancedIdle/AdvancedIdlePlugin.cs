@@ -29,6 +29,7 @@ internal sealed class AdvancedIdlePlugin : IGitHubPluginUpdates, IBot, IBotModul
 
 	private static readonly ConcurrentDictionary<string, AdvancedIdleHandler> Handlers = new();
 	private static readonly ConcurrentDictionary<string, BotIdler> Idlers = new();
+	private static readonly ConcurrentDictionary<string, bool> LastPlayingBlocked = new();
 
 	public string Name => "AdvancedIdle";
 	public string RepositoryName => "cwilliams5/ASF-AdvancedIdle";
@@ -51,6 +52,7 @@ internal sealed class AdvancedIdlePlugin : IGitHubPluginUpdates, IBot, IBotModul
 		ArgumentNullException.ThrowIfNull(bot);
 
 		Handlers.TryRemove(bot.BotName, out _);
+		LastPlayingBlocked.TryRemove(bot.BotName, out _);
 
 		if (Idlers.TryRemove(bot.BotName, out BotIdler? idler)) {
 			idler.Dispose();
@@ -74,7 +76,7 @@ internal sealed class AdvancedIdlePlugin : IGitHubPluginUpdates, IBot, IBotModul
 
 		// Covers the one ASF transition with no plugin event (upstream-notes "the one uncovered
 		// transition"): account freed, farmer declines to resume, ResetGamesPlayed runs silently.
-		callbackManager.Subscribe<SteamUser.PlayingSessionStateCallback>(_ => PumpSoon(bot, PostTransitionDelayMs, "playing-session change", true));
+		callbackManager.Subscribe<SteamUser.PlayingSessionStateCallback>(callback => OnPlayingSessionState(bot, callback));
 
 		return Task.CompletedTask;
 	}
@@ -142,6 +144,26 @@ internal sealed class AdvancedIdlePlugin : IGitHubPluginUpdates, IBot, IBotModul
 		ArgumentNullException.ThrowIfNull(args);
 
 		return await IdleCommands.Handle(bot, Idlers, access, args).ConfigureAwait(false);
+	}
+
+	private static void OnPlayingSessionState(Bot bot, SteamUser.PlayingSessionStateCallback callback) {
+		ArgumentNullException.ThrowIfNull(bot);
+		ArgumentNullException.ThrowIfNull(callback);
+
+		// Steam echoes this callback for our OWN games-played writes (and ASF's) - and with a
+		// custom name configured, every assert is a 2-send clean-session dance, so reacting to
+		// every callback self-sustains (witnessed 2026-07-10: a 2-second re-assert loop). The
+		// only information this callback carries for us is the BLOCKED flag transitioning:
+		// another session started or stopped playing on the account.
+		bool blocked = callback.PlayingBlocked;
+
+		if (LastPlayingBlocked.TryGetValue(bot.BotName, out bool previous) && (previous == blocked)) {
+			return;
+		}
+
+		LastPlayingBlocked[bot.BotName] = blocked;
+
+		PumpSoon(bot, PostTransitionDelayMs, blocked ? "account blocked" : "account freed", !blocked);
 	}
 
 	private static Task PumpSoon(Bot bot, int delayMs, string reason, bool forceReassert = false) {

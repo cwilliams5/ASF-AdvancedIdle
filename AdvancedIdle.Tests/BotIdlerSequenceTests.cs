@@ -70,10 +70,21 @@ internal sealed class BotIdlerSequenceTests {
 		Assert.AreEqual(4, steam.Sends.Count);
 		CollectionAssert.AreEqual(new[] { 4u, 5u, 1u }, steam.Sends[3].AppIds);
 
+		// Echo-loop floor: a forced re-assert 10s after a send is swallowed (witnessed live:
+		// playing-session echoes of our own writes self-sustained a 2-second loop)...
+		clock.Advance(TimeSpan.FromSeconds(10));
+		await idler.Pump("account freed", forceReassert: true).ConfigureAwait(false);
+		Assert.AreEqual(4, steam.Sends.Count);
+
+		// ...but past the floor a forced re-assert goes through.
+		clock.Advance(TimeSpan.FromSeconds(55));
+		await idler.Pump("account freed", forceReassert: true).ConfigureAwait(false);
+		Assert.AreEqual(5, steam.Sends.Count);
+
 		// Disabled config never sends.
 		using BotIdler disabled = new(IdleConfig.Default, state, steam, new MemoryStore(), new ListLog(), clock, startHeartbeat: false);
 		await disabled.Pump("anything").ConfigureAwait(false);
-		Assert.AreEqual(4, steam.Sends.Count);
+		Assert.AreEqual(5, steam.Sends.Count);
 	}
 
 	private sealed class FakeClock : IIdleClock {
