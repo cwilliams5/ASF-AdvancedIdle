@@ -49,7 +49,19 @@ public sealed class BotIdler : IDisposable {
 		Log = log ?? throw new ArgumentNullException(nameof(log));
 		Clock = clock ?? throw new ArgumentNullException(nameof(clock));
 
-		PersistedState persisted = store.Load();
+		PersistedState persisted;
+
+		try {
+			persisted = store.Load();
+		} catch (Exception e) {
+			// A member missing from the trimmed host throws at JIT time, INSIDE the callee but
+			// before its own try/catch exists - only this call site can catch it (live smoke:
+			// a JIT-failed Load() escaped and killed the whole idler). Persistence loss must
+			// never cost the feature.
+			log.Warn($"state load failed hard, starting fresh: {e}");
+			persisted = new PersistedState();
+		}
+
 		Quarantined = persisted.Quarantined;
 		Observations = persisted.Observations;
 		Ledger = persisted.Ledger;

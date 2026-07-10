@@ -109,12 +109,17 @@ internal sealed class AdvancedIdlePlugin : IGitHubPluginUpdates, IBot, IBotModul
 			return Task.CompletedTask;
 		}
 
-		LogAdapter log = new(bot);
-		string statePath = Bot.GetFilePath($"{bot.BotName}_AdvancedIdle", Bot.EFileType.Database) ?? throw new InvalidOperationException(nameof(statePath));
+		try {
+			LogAdapter log = new(bot);
+			string statePath = Bot.GetFilePath($"{bot.BotName}_AdvancedIdle", Bot.EFileType.Database) ?? throw new InvalidOperationException(nameof(statePath));
 
-		Idlers[bot.BotName] = new BotIdler(config, new BotStateAdapter(bot), new SteamActionsAdapter(bot, handler), new FileStateStore(statePath, log), log, SystemClock.Instance);
+			Idlers[bot.BotName] = new BotIdler(config, new BotStateAdapter(bot), new SteamActionsAdapter(bot, handler), new FileStateStore(statePath, log), log, SystemClock.Instance);
 
-		bot.ArchiLogger.LogGenericInfo($"AdvancedIdle enabled: batch={config.EffectiveBatchSize} rotation={config.RotationMinutes}m blacklist={config.Blacklist.Count} quarantine={(config.QuarantineEnabled ? "on" : "off")}");
+			bot.ArchiLogger.LogGenericInfo($"AdvancedIdle enabled: batch={config.EffectiveBatchSize} rotation={config.RotationMinutes}m blacklist={config.Blacklist.Count} quarantine={(config.QuarantineEnabled ? "on" : "off")}");
+		} catch (Exception e) {
+			// Never let idler construction take the bot down with it - farming must survive us.
+			bot.ArchiLogger.LogGenericError($"AdvancedIdle failed to start for this bot: {e}");
+		}
 
 		return Task.CompletedTask;
 	}
@@ -194,6 +199,13 @@ internal sealed class SystemClock : IIdleClock {
 ///     (ASF parses bot configs with it on this very host).
 /// </summary>
 internal sealed class FileStateStore(string filePath, IIdleLog log) : IStateStore {
+	// Everything below sticks to the most boring BCL surface possible, because a member missing
+	// from the trimmed host throws MissingMethodException at JIT TIME - before this method's own
+	// try/catch exists (live smoke: Load() died at JIT on its first shape, killing the idler).
+	// Callers additionally wrap the call site, where a JIT failure IS catchable.
+
+	private static readonly DateTime UnixEpoch = new(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
 	public PersistedState Load() {
 		try {
 			if (!File.Exists(filePath)) {
@@ -207,21 +219,29 @@ internal sealed class FileStateStore(string filePath, IIdleLog log) : IStateStor
 
 			if (root.TryGetProperty("quarantined", out JsonElement quarantined)) {
 				foreach (JsonElement entry in quarantined.EnumerateArray()) {
-					state.Quarantined.Add(entry.GetUInt32());
+					if (entry.TryGetUInt32(out uint appID)) {
+						state.Quarantined.Add(appID);
+					}
 				}
 			}
 
 			if (root.TryGetProperty("observations", out JsonElement observations)) {
 				foreach (JsonProperty entry in observations.EnumerateObject()) {
-					JsonElement fields = entry.Value;
-					state.Observations[uint.Parse(entry.Name, CultureInfo.InvariantCulture)] = new ObservationState(fields[0].GetUInt32(), fields[1].GetUInt32(), fields[2].GetUInt32(), DateTimeOffset.FromUnixTimeSeconds(fields[3].GetInt64()).UtcDateTime);
+					uint[] fields = ReadUIntArray(entry.Value, 4);
+
+					if ((fields.Length == 4) && uint.TryParse(entry.Name, out uint appID)) {
+						state.Observations[appID] = new ObservationState(fields[0], fields[1], fields[2], UnixEpoch.AddSeconds(fields[3]));
+					}
 				}
 			}
 
 			if (root.TryGetProperty("ledger", out JsonElement ledger)) {
 				foreach (JsonProperty entry in ledger.EnumerateObject()) {
-					JsonElement fields = entry.Value;
-					state.Ledger[uint.Parse(entry.Name, CultureInfo.InvariantCulture)] = new AccrualEntry(fields[0].GetUInt32(), fields[1].GetUInt32());
+					uint[] fields = ReadUIntArray(entry.Value, 2);
+
+					if ((fields.Length == 2) && uint.TryParse(entry.Name, out uint appID)) {
+						state.Ledger[appID] = new AccrualEntry(fields[0], fields[1]);
+					}
 				}
 			}
 
@@ -236,10 +256,20 @@ internal sealed class FileStateStore(string filePath, IIdleLog log) : IStateStor
 	public void Save(PersistedState state) {
 		StringBuilder json = new(256);
 		json.Append("{\"quarantined\":[");
-		json.AppendJoin(',', state.Quarantined.OrderBy(static appID => appID));
-		json.Append("],\"observations\":{");
 
 		bool first = true;
+
+		foreach (uint appID in state.Quarantined.OrderBy(static entry => entry)) {
+			if (!first) {
+				json.Append(',');
+			}
+
+			first = false;
+			json.Append(Num(appID));
+		}
+
+		json.Append("],\"observations\":{");
+		first = true;
 
 		foreach ((uint appID, ObservationState observed) in state.Observations.OrderBy(static pair => pair.Key)) {
 			if (!first) {
@@ -247,7 +277,9 @@ internal sealed class FileStateStore(string filePath, IIdleLog log) : IStateStor
 			}
 
 			first = false;
-			json.Append(CultureInfo.InvariantCulture, $"\"{appID}\":[{observed.ServerMinutesAtFirstObservation},{observed.CreditedIdleMinutes},{observed.CompletedRotations},{new DateTimeOffset(observed.LastCreditUtc.ToUniversalTime()).ToUnixTimeSeconds()}]");
+
+			uint unixSeconds = (uint) Math.Max(0, (observed.LastCreditUtc.ToUniversalTime() - UnixEpoch).TotalSeconds);
+			json.Append('"').Append(Num(appID)).Append("\":[").Append(Num(observed.ServerMinutesAtFirstObservation)).Append(',').Append(Num(observed.CreditedIdleMinutes)).Append(',').Append(Num(observed.CompletedRotations)).Append(',').Append(Num(unixSeconds)).Append(']');
 		}
 
 		json.Append("},\"ledger\":{");
@@ -259,7 +291,7 @@ internal sealed class FileStateStore(string filePath, IIdleLog log) : IStateStor
 			}
 
 			first = false;
-			json.Append(CultureInfo.InvariantCulture, $"\"{appID}\":[{entry.ServerBaselineMinutes},{entry.CreditedMinutes}]");
+			json.Append('"').Append(Num(appID)).Append("\":[").Append(Num(entry.ServerBaselineMinutes)).Append(',').Append(Num(entry.CreditedMinutes)).Append(']');
 		}
 
 		json.Append("}}");
@@ -268,4 +300,24 @@ internal sealed class FileStateStore(string filePath, IIdleLog log) : IStateStor
 		File.WriteAllText(temp, json.ToString());
 		File.Move(temp, filePath, true);
 	}
+
+	private static uint[] ReadUIntArray(JsonElement array, int expected) {
+		if (array.ValueKind != JsonValueKind.Array) {
+			return [];
+		}
+
+		List<uint> result = new(expected);
+
+		foreach (JsonElement entry in array.EnumerateArray()) {
+			if (!entry.TryGetUInt32(out uint value)) {
+				return [];
+			}
+
+			result.Add(value);
+		}
+
+		return result.ToArray();
+	}
+
+	private static string Num(uint value) => value.ToString(CultureInfo.InvariantCulture);
 }
