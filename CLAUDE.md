@@ -66,6 +66,14 @@ if a check fires on your change, fix the code, not the check. Modifying a
 check, allowlist, or pinned hash to make a failure disappear is the one move
 that always requires the human's eyes.
 
+## Doc map
+
+`docs/architecture.md` (component map + the hard-won send policy) ·
+`docs/upstream-notes.md` (pinned ASF facts + re-pin protocol) · `plan.md` (design +
+phase log) · `SMOKE.md` (live checklist) · `docs/smoke-2026-07-09.md` (first-night
+evidence) · `CLAUDE.local.md` (machine-local install paths + deploy recipe + user
+sensitivities — untracked; read it before any live-deploy work).
+
 ## Judgment rules (can't be checks)
 
 - Steam-network behavior can differ from protocol shape — when logs disagree

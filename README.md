@@ -1,5 +1,12 @@
 # ASF-AdvancedIdle
 
+[![CI](https://img.shields.io/github/actions/workflow/status/cwilliams5/ASF-AdvancedIdle/ci.yml?branch=main&logo=github&label=CI)](https://github.com/cwilliams5/ASF-AdvancedIdle/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/cwilliams5/ASF-AdvancedIdle?include_prereleases&logo=github&label=Release)](https://github.com/cwilliams5/ASF-AdvancedIdle/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/cwilliams5/ASF-AdvancedIdle/total?logo=github&label=Downloads)](https://github.com/cwilliams5/ASF-AdvancedIdle/releases)
+[![License](https://img.shields.io/github/license/cwilliams5/ASF-AdvancedIdle?label=License)](LICENSE.txt)
+[![C#](https://img.shields.io/github/languages/top/cwilliams5/ASF-AdvancedIdle)](https://github.com/cwilliams5/ASF-AdvancedIdle/tree/main/AdvancedIdle)
+[![ASF](https://img.shields.io/badge/ASF-6.3.7.0%2B-blueviolet?logo=steam)](https://github.com/JustArchiNET/ArchiSteamFarm)
+
 An **[ArchiSteamFarm](https://github.com/JustArchiNET/ArchiSteamFarm)** plugin that idles
 your least-played owned games whenever the bot has nothing to card-farm, re-picking the
 batch on a rotation timer so playtime spreads evenly across your **entire** library —
@@ -71,8 +78,18 @@ pwsh ./test-all.ps1   # build -> pregate -> tests: the same gate CI runs
 
 Debug builds copy the plugin into the ASF submodule's own `plugins/` directory, so you can
 run the in-tree ASF directly for live testing. Development conventions live in
-`CLAUDE.md`; the ASF behaviors this plugin depends on are documented (and mechanically
-pinned) in `docs/upstream-notes.md`.
+`CLAUDE.md`; the component map is `docs/architecture.md`; the ASF behaviors this plugin
+depends on are documented (and mechanically pinned) in `docs/upstream-notes.md`.
+
+## Auto-updates
+
+The plugin supports ASF's plugin auto-updates. Opt in via your global `ASF.json`:
+
+```json
+"PluginsUpdateList": ["AdvancedIdle"]
+```
+
+ASF then updates it alongside its own update cycle (or on demand via `!updateplugins`).
 
 ## License
 
