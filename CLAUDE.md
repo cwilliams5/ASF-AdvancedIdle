@@ -66,13 +66,24 @@ if a check fires on your change, fix the code, not the check. Modifying a
 check, allowlist, or pinned hash to make a failure disappear is the one move
 that always requires the human's eyes.
 
+### Philosophy
+- **Prefer checks over rules.** Machines enforce; rules explain judgment.
+- **Test before fix.** When a bug class is discovered, write the check FIRST
+  while the bug is live proof, then fix.
+- **Checks grow from failures.** Real development reveals new classes of bugs
+  to gate.
+- **Cage-modifier warning.** If a check fires on your change, fix the code, not
+  the check. Modifying a check, allowlist, or pinned hash to make a failure
+  disappear is the one move that always requires the human's eyes.
+
 ## Doc map
 
 `docs/architecture.md` (component map + send policy + extension seams) ·
 `docs/upstream-notes.md` (pinned ASF facts + re-pin protocol) · `SMOKE.md` (live
-checklist) · `docs/smoke-2026-07-09.md` (first-night evidence) · `CLAUDE.local.md`
-(machine-local install paths + deploy recipe + user sensitivities — untracked; read it
-before any live-deploy work).
+checklist) · `docs/smoke-2026-07-09.md` (first-night evidence). Machine-local
+operator context (install paths, deploy recipe, user sensitivities) lives outside
+the repo in the local assistant's persistent memory — nothing machine-specific is
+tracked in-tree; recall it before any live-deploy work.
 
 ## Judgment rules (can't be checks)
 
@@ -83,3 +94,11 @@ before any live-deploy work).
   at once, suspect data lag, not thirty broken games).
 - Check `docs/upstream-notes.md` and the in-tree ASF source (`ArchiSteamFarm/`,
   wiki included as a nested submodule) before guessing at ASF semantics.
+
+## Additional Context
+
+**Updating this file:** Main CLAUDE.md is for "tattoo" rules needed in every
+session. Domain-specific lessons go in `.claude/rules/`. Before adding anything,
+ask: "Would removing this cause Claude to make mistakes?" Prefer building static
+analysis checks (`pregate/check_*.ps1`, auto-discovered by pre-gate) over adding
+rules — machines enforce, rules explain judgment.

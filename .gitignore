@@ -536,3 +536,10 @@ $RECYCLE.BIN/
 
 # Machine-specific operator context (live-install paths, deploy notes) - never public
 /CLAUDE.local.md
+
+# Claude Code project config: tracked. Without these negations the VS build-output
+# rule [Rr]elease/ above silently ignores .claude/skills/release/.
+!.claude/
+!.claude/**
+# ...except per-machine local settings
+.claude/settings.local.json
