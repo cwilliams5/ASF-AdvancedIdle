@@ -77,7 +77,7 @@ witnessed failures — each header names its incident.
 
 `docs/architecture.md` (component map + send policy + extension seams) ·
 `docs/upstream-notes.md` (pinned ASF facts + re-pin protocol) · `SMOKE.md` (live
-checklist) · `docs/smoke-2026-07-09.md` (first-night evidence). Machine-local
+checklist). Machine-local
 operator context (install paths, deploy recipe, user sensitivities) lives outside
 the repo in the local assistant's persistent memory — nothing machine-specific is
 tracked in-tree; recall it before any live-deploy work.

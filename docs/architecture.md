@@ -2,8 +2,7 @@
 
 How AdvancedIdle is put together and why. Companion docs: `docs/upstream-notes.md` (the
 hand-verified ASF behaviors everything rests on, mechanically pinned by pregate),
-`docs/smoke-2026-07-09.md` (first live validation night), `SMOKE.md` (the
-machine-unverifiable checklist). The original phased design doc (plan.md) is retired;
+`SMOKE.md` (the machine-unverifiable checklist). The original phased design doc (plan.md) is retired;
 its history lives in git.
 
 ## Component map
