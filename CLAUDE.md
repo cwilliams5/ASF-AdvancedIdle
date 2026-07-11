@@ -61,10 +61,7 @@ Never hand-edit a generated doc section.
 
 `pregate/pregate.ps1` auto-discovers `pregate/check_*.ps1`; any failure blocks
 the suite. Dropping a new `check_*.ps1` file IS registration. Checks encode
-witnessed failures — each header names its incident. **Cage-modifier warning:**
-if a check fires on your change, fix the code, not the check. Modifying a
-check, allowlist, or pinned hash to make a failure disappear is the one move
-that always requires the human's eyes.
+witnessed failures — each header names its incident.
 
 ### Philosophy
 - **Prefer checks over rules.** Machines enforce; rules explain judgment.
