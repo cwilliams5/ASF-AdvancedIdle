@@ -9,7 +9,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace AdvancedIdle.Tests;
 
 /// <summary>
-///     The repo's end-to-end determinism oracle (plan.md): a synthetic library driven through
+///     The repo's end-to-end determinism oracle (docs/architecture.md): a synthetic library driven through
 ///     selection + accrual + quarantine across simulated rotations, including one sticky-zero
 ///     title and a playtime-reporting lag window. The normalized trace diffs against a blessed
 ///     baseline - the layer that catches "correct refactoring logic with incorrect ripple

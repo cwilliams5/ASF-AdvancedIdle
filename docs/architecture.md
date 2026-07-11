@@ -2,8 +2,9 @@
 
 How AdvancedIdle is put together and why. Companion docs: `docs/upstream-notes.md` (the
 hand-verified ASF behaviors everything rests on, mechanically pinned by pregate),
-`plan.md` (the original design + phase history), `docs/smoke-2026-07-09.md` (first live
-validation night), `SMOKE.md` (the machine-unverifiable checklist).
+`docs/smoke-2026-07-09.md` (first live validation night), `SMOKE.md` (the
+machine-unverifiable checklist). The original phased design doc (plan.md) is retired;
+its history lives in git.
 
 ## Component map
 
@@ -95,6 +96,16 @@ through `IBotModules.OnBotInitModules`, which re-fires on every config edit: the
 disposed and rebuilt from persisted state. Unknown `AdvancedIdle*` keys are ERRORS (a
 typo'd setting must never be silently ignored); config errors disable the idler for that
 bot, loudly.
+
+## Extension seams (pre-documented, not pre-built)
+
+- **Selection strategies:** the seam is the one pure function (`Selection.SelectBatch`);
+  a future strategy (random, round-robin, target-hours) is a new pure function plus a
+  registry row - nothing else moves.
+- **Multi-bot:** already natural - per-bot config, per-bot idler and state file; the only
+  plugin-wide state is the per-bot registries keyed by bot name.
+- **Status surfaces:** `BotIdler.DescribeStatus` is the human string; a structured
+  snapshot record could feed an IPC endpoint or external widget without touching logic.
 
 ## Test layers
 

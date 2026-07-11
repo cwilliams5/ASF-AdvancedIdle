@@ -102,7 +102,7 @@ the response. Request params ASF uses (mirror them, ArchiHandler.cs:352-358):
 
 Caveats: never-touched free games may be absent from the response (same universe
 VaporChill saw); `playtime_forever` lags real time by up to ~30 min — see the local
-accrual credit + quarantine anomaly guard in plan.md.
+accrual credit + quarantine anomaly guard in docs/architecture.md.
 
 ## Public surface we rely on
 

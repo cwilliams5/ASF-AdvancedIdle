@@ -9,7 +9,7 @@ public static class Selection {
 	///     Picks the batch to idle: lowest effective playtime first (server-reported + live local
 	///     credit), deterministic appID tiebreak, minus blacklist and quarantine. With a mostly-zero
 	///     library this naturally raises the floor - each rotation's credit lifts the batch above
-	///     the tie so the next lowest set rotates in (plan.md).
+	///     the tie so the next lowest set rotates in (docs/architecture.md).
 	/// </summary>
 	public static IReadOnlyList<uint> SelectBatch(IReadOnlyList<GameSnapshot> library, IdleConfig config, IReadOnlyCollection<uint> quarantined, IReadOnlyDictionary<uint, AccrualEntry> accrual) {
 		ArgumentNullException.ThrowIfNull(library);
