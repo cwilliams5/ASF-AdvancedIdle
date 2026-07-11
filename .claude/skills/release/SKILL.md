@@ -51,8 +51,10 @@ draft) with `prerelease: true`, `makeLatest: false`, `immutableCreate: true`, bo
    `UpdateChannel: Stable` IGNORES prereleases — user auto-updates arm only when the
    human reviews the release page and flips it:
    `gh release edit <Version> --prerelease=false --latest`.
-   (First run: if `immutableCreate` rejects the edit, flip it in the web UI and record
-   here which path worked.) Reminder: the updater queries GitHub anonymously — releases
+   (Verified on 0.1.0.0: the gh edit path works. The release reported
+   `isImmutable: false` despite `immutableCreate: true` — GitHub immutability
+   apparently needs a repo-level setting too — so prerelease/latest edits are not
+   blocked.) Reminder: the updater queries GitHub anonymously — releases
    reach users only while the repo is PUBLIC. Making the repo public is its own human
    decision, not this skill's.
 8. **Report.** Show the release URL and a short summary of what shipped and what state
